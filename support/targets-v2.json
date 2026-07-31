@@ -16,7 +16,7 @@
   "pageSize": 4096,
   "exploit": {
     "url": "https://raw.githubusercontent.com/Matheus-TestUser1/Root-My-Galaxy-Payloads/main/artifacts/essi-S721BXXS3AYB8/cve-2026-43499-app.so",
-    "size": 104128
+    "size": 124960
   },
   "kernelsu": {
     "url": "https://raw.githubusercontent.com/Matheus-TestUser1/Root-My-Galaxy-Payloads/main/kernelsu/ksud-essi-S721BXXS3AYB8-kdp",
