@@ -219,16 +219,16 @@
 // ============================================================================
 // FAKE WAITER LAYOUT - FORMATO COMPACTO (kernel 6.1+)
 // ============================================================================
-#define FAKE_WAITER_LAYOUT_SIZE      0x58
+#define FAKE_WAITER_LAYOUT_SIZE       0x58
 
-#define FAKE_WAITER_TREE_ENTRY_OFF   0x00
+#define FAKE_WAITER_TREE_ENTRY_OFF    0x00
 #define FAKE_WAITER_PI_TREE_ENTRY_OFF 0x18
-#define FAKE_WAITER_TASK_OFF         0x30
-#define FAKE_WAITER_LOCK_OFF         0x38
-#define FAKE_WAITER_WAKE_STATE_OFF   0x40
-#define FAKE_WAITER_PRIO_OFF         0x44
-#define FAKE_WAITER_DEADLINE_OFF     0x48
-#define FAKE_WAITER_WW_CTX_OFF       0x50
+#define FAKE_WAITER_TASK_OFF          0x30
+#define FAKE_WAITER_LOCK_OFF          0x38
+#define FAKE_WAITER_WAKE_STATE_OFF    0x40
+#define FAKE_WAITER_PRIO_OFF          0x44
+#define FAKE_WAITER_DEADLINE_OFF      0x48
+#define FAKE_WAITER_WW_CTX_OFF        0x50
 
 // ============================================================================
 // FAKE TASK LAYOUT
