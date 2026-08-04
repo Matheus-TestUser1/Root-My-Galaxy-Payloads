@@ -545,12 +545,12 @@ void *slide_consumer_thread(void *arg __attribute__((unused))) {
 
 #if defined(APP_REQUIRE_FRESH_P0_SESSION) && APP_REQUIRE_FRESH_P0_SESSION
     int tid = atomic_load(&slide_waiter_tid);
+  uint64_t pselect_age_usec = 0;
 #if defined(SLIDE_SYNC_PSELECT_SYSCALL) && SLIDE_SYNC_PSELECT_SYSCALL
     int ready_ok = -1;
     int guard_ok = -1;
     size_t ready_elapsed_usec = 0;
     size_t guard_elapsed_usec = 0;
-    uint64_t pselect_age_usec = 0;
     char ready_wchan[64] = "<not-read>";
     char guard_wchan[64] = "<not-read>";
 #endif
