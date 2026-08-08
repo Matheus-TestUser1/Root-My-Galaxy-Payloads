@@ -230,6 +230,11 @@
 #define FAKE_WAITER_DEADLINE_OFF      0x48
 #define FAKE_WAITER_WW_CTX_OFF        0x50
 
+#define FAKE_WAITER_TREE_PRIO_OFF       FAKE_WAITER_PRIO_OFF
+#define FAKE_WAITER_TREE_DEADLINE_OFF   FAKE_WAITER_DEADLINE_OFF
+#define FAKE_WAITER_PI_TREE_PRIO_OFF    FAKE_WAITER_PRIO_OFF
+#define FAKE_WAITER_PI_TREE_DEADLINE_OFF FAKE_WAITER_DEADLINE_OFF
+
 // ============================================================================
 // FAKE TASK LAYOUT
 // ============================================================================
@@ -248,7 +253,7 @@
 // ============================================================================
 #define LOCK_OFF 0x0000
 #define W0_OFF 0x0040
-#define FOPS_OFF 0x2000
+#define FOPS_OFF 0x0a40
 #define SCRATCH_OFF 0x0c00
 #define RIGHT_OFF  0x0bc0
 #define LEFT_OFF  0x0b80
