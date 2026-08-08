@@ -233,7 +233,7 @@
 // ============================================================================
 // FAKE TASK LAYOUT
 // ============================================================================
-#define FAKE_TASK_OFF 0x3200
+#define FAKE_TASK_OFF 0x00c0
 #define FAKE_TASK_USAGE_OFF 0x40
 #define FAKE_TASK_PRIO_OFF 0x84
 #define FAKE_TASK_NORMAL_PRIO_OFF 0x8c
@@ -246,12 +246,12 @@
 // ============================================================================
 // OUTRAS STRUCTS
 // ============================================================================
-#define LOCK_OFF 0x2210
-#define W0_OFF 0x2350
+#define LOCK_OFF 0x0000
+#define W0_OFF 0x0040
 #define FOPS_OFF 0x2000
-#define SCRATCH_OFF 0x3000
-#define RIGHT_OFF 0x4440
-#define LEFT_OFF 0x5550
+#define SCRATCH_OFF 0x0c00
+#define RIGHT_OFF  0x0bc0
+#define LEFT_OFF  0x0b80
 
 #define CFG_PAGE_OFF 16
 #define CFG_NEEDS_READ_FILL_OFF 80
@@ -285,6 +285,7 @@
 #define FOPS_OWNER_OFF 0x00
 #define FOPS_LLSEEK_OFF 0x08
 #define FOPS_READ_OFF 0x10
+#define FOPS_TABLE_OFF  0x0a40
 #define FOPS_WRITE_OFF 0x18
 #define FOPS_READ_ITER_OFF 0x20
 #define FOPS_WRITE_ITER_OFF 0x28
