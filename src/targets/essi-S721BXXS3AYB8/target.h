@@ -48,7 +48,7 @@
 // ============================================================================
 // KERNELSNITCH & HEAP CONFIGS
 // ============================================================================
-#define MM_STRUCT_SZ 0x400
+#define MM_STRUCT_SZ 0x3C0
 #define MM_ORDER 3
 #define KERNELSNITCH_MTE_ENABLED 1
 #define KERNELSNITCH_VERBOSE 1
@@ -59,7 +59,7 @@
 // ============================================================================
 // SKB DATA DELTA
 // ============================================================================
-#define SKB_DATA_DELTA (-0xe70LL)
+#define SKB_DATA_DELTA (-0xe80LL)
 
 // ============================================================================
 // RECLAIM / HEAP SPRAY CONFIGS
