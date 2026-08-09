@@ -171,11 +171,11 @@
       "requiresFreshP0Session": true,
       "exploit": {
         "url": "https://raw.githubusercontent.com/NORTCHOT/Root-My-Galaxy-Payloads/main/artifacts/r12s-S721BXXSCDZF3/cve-2026-43499-app.so", 
-        "size": 125072
+        "size": 104128
       },
       "kernelsu": {
         "url": "https://raw.githubusercontent.com/NORTCHOT/Root-My-Galaxy-Payloads/main/kernelsu/ksud-r12s-S721BXXSCDZF3-kdp",
-        "size": 4779800
+        "size": 4779728
       }
     }
   ]
