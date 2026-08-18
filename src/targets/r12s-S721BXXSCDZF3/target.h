@@ -13,6 +13,8 @@
   "samsung/r12sxxx/r12s:16/BP4A.251205.006/S721BXXSCDZF3:user/release-keys"
 #endif
 
+#define MM_STRUCT_SZ 0x3c0
+
 #define KIMAGE_TEXT_BASE 0xffffffc008000000ULL
 #define P0_PAGE_OFFSET 0xffffff8000000000ULL
 #define P0_PHYS_OFFSET 0x80000000ULL
