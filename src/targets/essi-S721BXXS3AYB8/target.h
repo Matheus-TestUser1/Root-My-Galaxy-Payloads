@@ -308,6 +308,6 @@
 #define CRED_CAP_EFFECTIVE_OFF    56
 #define CRED_CAP_BSET_OFF         64
 #define CRED_SECURITY_OFF         120
-#define TASK_PID_OFF              0x5E4   // Ajuste se necessário (offset de pid no task_struct)
+#define TASK_PID_OFF             0x630    // Ajuste se necessário (offset de pid no task_struct)
 #define TASK_CRED_OFF             0x838   // offsetof(task_struct, cred) = 2104
 #endif
