@@ -295,5 +295,19 @@
 #define FOPS_RELEASE_OFF 0x80
 #define FOPS_SPLICE_READ_OFF 0xc8
 #define FOPS_SHOW_FDINFO_OFF 0xe0
-
+#define CRED_UID_OFF              4
+#define CRED_GID_OFF              8
+#define CRED_SUID_OFF             12
+#define CRED_SGID_OFF             16
+#define CRED_EUID_OFF             20
+#define CRED_EGID_OFF             24
+#define CRED_FSUID_OFF            28
+#define CRED_FSGID_OFF            32
+#define CRED_CAP_INHERITABLE_OFF  40
+#define CRED_CAP_PERMITTED_OFF    48
+#define CRED_CAP_EFFECTIVE_OFF    56
+#define CRED_CAP_BSET_OFF         64
+#define CRED_SECURITY_OFF         120
+#define TASK_PID_OFF              0x5E4   // Ajuste se necessário (offset de pid no task_struct)
+#define TASK_CRED_OFF             0x838   // offsetof(task_struct, cred) = 2104
 #endif
