@@ -10,7 +10,7 @@
 #define SLIDE_WAIT_NSEC 50000000L
 #define SLIDE_REQUEUE_MAX_POLLS 1000
 #define SLIDE_REQUEUE_POLL_USEC 1000
-
+static useconds_t pselect_age_usec = 0;
 #if defined(SLIDE_P0_OFFSET_CANDIDATES) && \
     (!defined(APP_PHYS_P0_ORACLE) || !APP_PHYS_P0_ORACLE)
 static const uintptr_t slide_p0_offsets[] = {
@@ -20,7 +20,6 @@ static const uintptr_t slide_p0_offsets[] = {
 
 static uint32_t slide_f_wait;
 static uint32_t slide_f_pi_target;
-static useconds_t pselect_age_usec = 0;
 static uint32_t slide_f_pi_chain;
 static atomic_int slide_waiter_ready;
 static atomic_int slide_waiter_waiting;
