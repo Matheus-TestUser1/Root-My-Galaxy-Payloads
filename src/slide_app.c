@@ -20,6 +20,7 @@ static const uintptr_t slide_p0_offsets[] = {
 
 static uint32_t slide_f_wait;
 static uint32_t slide_f_pi_target;
+static useconds_t pselect_age_usec = 0;
 static uint32_t slide_f_pi_chain;
 static atomic_int slide_waiter_ready;
 static atomic_int slide_waiter_waiting;
