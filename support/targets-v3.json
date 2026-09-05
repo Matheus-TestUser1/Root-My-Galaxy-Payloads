@@ -70,21 +70,21 @@
       }
     },
     {
-      "payloadId": "e3q-S928USQS6DZF2",
-      "displayName": "Galaxy S24 Ultra | Kernel 6.1.145",
+      "payloadId": "r12s-S721U1",
+      "displayName": "Galaxy S24 FE American | Kernel 6.1.157",
       "models": [
-        "SM-S928U"
+        "SM-S721U1"
       ],
       "kernelVersions": [
-        "6.1.145"
+        "6.1.157"
       ],
       "exploit": {
-        "url": "https://raw.githubusercontent.com/Matheus-TestUser1/Root-My-Galaxy-Payloads/main/artifacts/e3q-S928USQS6DZF2/cve-2026-43499-app.so",
-        "size": 104128
+        "url": "https://raw.githubusercontent.com/Matheus-TestUser1/Root-My-Galaxy-Payloads/main/artifacts/r12s-S721U1/cve-2026-43499-app.so",
+        "size": 139600
       },
       "kernelsu": {
-        "url": "https://raw.githubusercontent.com/Matheus-TestUser1/Root-My-Galaxy-Payloads/main/kernelsu/ksud-e3q-S928USQS6DZF2-kdp",
-        "size": 4726416
+        "url": "https://raw.githubusercontent.com/Matheus-TestUser1/Root-My-Galaxy-Payloads/main/kernelsu/ksud-r12s-S721BXXSCDZF3-kdp",
+        "size": 6419768
       }
     },
     {
