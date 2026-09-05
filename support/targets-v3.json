@@ -130,21 +130,21 @@
       }
     },
     {
-      "payloadId": "a36xq-A366WVLS3AYG1",
-      "displayName": "Galaxy A36 5G | Kernel 6.6.46",
+      "payloadId": "r12s-S721BXXSCDZF3",
+      "displayName": "Samsung S24 FE Canadian | Kernel 6.1.157",
       "models": [
-        "SM-A366W"
+        "SM-S721W"
       ],
       "kernelVersions": [
-        "6.6.46"
+        "6.1.157"
       ],
       "exploit": {
-        "url": "https://raw.githubusercontent.com/Matheus-TestUser1/Root-My-Galaxy-Payloads/main/artifacts/a36xq-A366WVLS3AYG1/cve-2026-43499-app.so",
-        "size": 128688
+        "url": "https://raw.githubusercontent.com/Matheus-TestUser1/Root-My-Galaxy-Payloads/main/artifacts/r12s-S721BXXSCDZF3/cve-2026-43499-app.so",
+        "size": 104128
       },
       "kernelsu": {
-        "url": "https://raw.githubusercontent.com/Matheus-TestUser1/Root-My-Galaxy-Payloads/main/kernelsu/ksud-A366WVLS3AYG1-kdp",
-        "size": 4889120
+        "url": "https://raw.githubusercontent.com/BuSung-dev/Root-My-Galaxy-Payloads/main/kernelsu/ksud-r12s-S721BXXSCDZF3-kdp",
+        "size": 6419768
       }
     },
     {
