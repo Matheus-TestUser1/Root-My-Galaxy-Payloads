@@ -183,11 +183,29 @@
       "requiresFreshP0Session": true,
       "exploit": {
         "url": "https://raw.githubusercontent.com/Matheus-TestUser1/Root-My-Galaxy-Payloads/main/artifacts/essi-S721BXXS3AYB8/cve-2026-43499-app.so",
-        "size":  139616
+        "size": 139616
       },
       "kernelsu": {
         "url": "https://raw.githubusercontent.com/Matheus-TestUser1/Root-My-Galaxy-Payloads/main/kernelsu/ksud-essi-S721BXXS3AYB8-kdp",
         "size": 5694792
+      }
+    },
+    {
+      "payloadId": "r12s-S721BXXSDDZG1",
+      "displayName": "Galaxy S24 FE (July patch) | Kernel 6.1.157",
+      "models": [
+        "SM-S721B"
+      ],
+      "kernelVersions": [
+        "6.1.157"
+      ],
+      "exploit": {
+        "url": "https://raw.githubusercontent.com/Matheus-TestUser1/Root-My-Galaxy-Payloads/main/artifacts/r12s-S721BXXSDDZG1/cve-2026-43499-app.so",
+        "size": 139600
+      },
+      "kernelsu": {
+        "url": "https://raw.githubusercontent.com/Matheus-TestUser1/Root-My-Galaxy-Payloads/main/kernelsu/ksud-r12s-S721BXXSCDZF3-kdp",
+        "size": 6419768
       }
     }
   ]
